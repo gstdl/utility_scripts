@@ -6,7 +6,10 @@ from scipy.stats import entropy
 from time import time
 from matplotlib import rc,rcParams
 
-def set_notebook(style='seaborn-darkgrid',col_row=99999999999, figsize=(15,5)):
+def set_notebook(style='seaborn-whitegrid',col_row=99999999999, figsize=(15,5)):
+    '''
+    Set default parameters for the active notebook
+    '''
     global fsize,maxrows,maxcols,style_
     fsize = rcParams['figure.figsize'] = figsize
     maxrows = pd.options.display.max_rows = col_row
@@ -14,9 +17,16 @@ def set_notebook(style='seaborn-darkgrid',col_row=99999999999, figsize=(15,5)):
     style_ = plt.style.use(style)
 
 def memory_usage(df):
-    return '{:.4f} MB'.format(df.memory_usage().sum()/1024**2)
+    '''
+    df = <pandas dataframe>
+    Prints out the memory usage of the df
+    '''
+    print('Memory usage = {:.4f} MB'.format(df.memory_usage().sum()/1024**2))
 
 def resumetable(df):
+    '''
+    df = <pandas dataframe>
+    '''
     summary = pd.DataFrame(dict(dataFeatures=df.columns,
                             dataType=df.dtypes,
                             null=df.isna().sum(),
@@ -43,9 +53,15 @@ def resumetable(df):
                     summary.loc[feature,f'{s}_{i+1}']='-'
                     summary.loc[feature,f'{s}Count_{i+1}']='-'
     print('Dataframe shape = ',df.shape)
+    memory_usage(df)
     return summary
 
 def reduce_mem_usage(df, verbose=True):
+    '''
+    df = <pandas dataframe>
+    verbose = <boolean>
+    Reduce memory usage of df.
+    '''
     global data
     data = df
     numerics = ['int16', 'int32', 'int64', 'float16', 'float32', 'float64']
@@ -74,6 +90,11 @@ def reduce_mem_usage(df, verbose=True):
     if verbose: print('Mem. usage decreased from {:5.2f} to {:5.2f} Mb ({:.1f}% reduction)'.format(start_mem, end_mem, 100 * (start_mem - end_mem) / start_mem))
 
 def to_datetime(df,cols):
+    '''
+    df = <pandas dataframe>
+    cols = <columns to convert>
+    Converts the selected columns to datetime object.
+    '''
     if type(cols) != list:
         if type(cols) in [str,int,float]:
             cols = [cols]
@@ -95,6 +116,14 @@ def to_datetime(df,cols):
     print(df[cols].info())
 
 def get_timedelta(df, cols, new_col = 'time_delta', order = 0, preview=10):
+    '''
+    df = <pandas dataframe>
+    cols = <columns to subtract>
+    new_col = <column name for the substracion result>
+    order = (0/1) <order of substraction operation>
+    preciew  = integer <number of columns to preview>
+    Substract datetime columns in the dataframe into a new column named new_col.
+    '''
     if len(cols)!=2:
         raise AttributeError('Function only operate on 2 columns')
     if type(cols) not in [list,tuple,set]:
@@ -114,22 +143,31 @@ def get_timedelta(df, cols, new_col = 'time_delta', order = 0, preview=10):
         df[new_col] = ser*-1
     return df.head(preview)
 
-def viz_catcol(df,cols,top=10,bottom=10, hue=None,ax_grid0=True,ax_grid1=False,figsize=(15,5)):
+def viz_catcol(df,cols=None,top=10,bottom=10, ax_grid0=True,ax_grid1=False,figsize=(15,5), *args, **kwargs):
+    '''
+    df = <pandas dataframe>
+    cols = <columns to visualize (only accepts categorical columns)>
+    top = <number of most unique values to display>
+    bottom = <number of least unique values to display>
+    if top + bottom == 0, will display all values
+    ax_grid0 = boolean <display grid of axis 0 (actual values)
+    ax_grid1 = boolean <display grid of axis 1 (normalized values)
+    figsize = default figure size for each countplot
+    Visualize categorical columns in df using seaborn's countplot.
+    '''
     import warnings
     warnings.filterwarnings('ignore')
-    if hue!=None:
-        hue=df[hue]
-    if type(cols) != list:
-        if type(cols) in [str,int,float]:
-            cols = [cols]
-        else:
-            cols = list(cols)
-    not_found = []
-    for col in cols:
-        if col not in df.columns:
-            not_found.append(col)
-    if len(not_found)>0:
-        raise AttributeError(not_found, 'is not found in', list(df.columns))
+    if cols:
+        if type(cols) != list:
+            if type(cols) in [str,int,float]:
+                cols = [cols]
+            else:
+                cols = list(cols)
+        not_found = [col for col in cols if col not in df.columns]
+        if len(not_found)>0:
+            raise AttributeError(not_found, 'is not found in', list(df.columns))
+    else:
+        cols=df.select_dtypes('object').columns
     rows = len(cols)
     figsize=(figsize[0],figsize[1]*rows)
     if top!=0 and bottom!=0:
@@ -151,7 +189,7 @@ def viz_catcol(df,cols,top=10,bottom=10, hue=None,ax_grid0=True,ax_grid1=False,f
         else:
             bottom_=ln
         if top+bottom==0:
-            sns.countplot(y=df[col],ax=axe,order=ser.index,hue=hue)
+            sns.countplot(data=df,y=col,ax=axe,order=ser.index, *args, **kwargs)
             ax1=axe.twiny()
             ax1.set_xlim([i/ser.sum()*100 for i in axe.get_xlim()])
             ax1.set_xlabel('percentage (%)')
@@ -165,7 +203,7 @@ def viz_catcol(df,cols,top=10,bottom=10, hue=None,ax_grid0=True,ax_grid1=False,f
             else:
                 order=ser[-bottom:].index
                 s=f'Bottom {bottom_}'
-            sns.countplot(df[col],ax=axe,order=order,hue=hue)
+            sns.countplot(data=df,x=col,ax=axe,order=order, *args, **kwargs)
             axe.tick_params('x',labelrotation=90)
             axe.set_title(f'{col} Countplot {s}')
 
@@ -176,7 +214,7 @@ def viz_catcol(df,cols,top=10,bottom=10, hue=None,ax_grid0=True,ax_grid1=False,f
             ax1.grid(ax_grid1)
         else:
             for s,order,ax in zip([f'Top {top_}',f'Bottom {bottom_}'],[ser.index[:top],ser.index[-bottom:]],axe):
-                sns.countplot(df[col],ax=ax,order=order,hue=hue)
+                sns.countplot(data=df,x=col,ax=ax,order=order, *args, **kwargs)
                 ax.tick_params('x',labelrotation=90)
                 ax.set_title(f'{col} Countplot {s}')
                 ax1=ax.twinx()
@@ -187,3 +225,50 @@ def viz_catcol(df,cols,top=10,bottom=10, hue=None,ax_grid0=True,ax_grid1=False,f
     plt.tight_layout()
     plt.show()
         
+def viz_numcol(df, cols=None, hue = None, bins=5, *args, **kwargs):
+    '''
+    df = <pandas dataframe>
+    cols = <columns to visualize (only accepts numerical columns)>
+    hue = <hue for the plots>
+    bins = <number of bins to display in the histogram plot>
+    Visualize numerical columns in df using seaborn's boxplot and distplot.
+    '''
+    from math import ceil
+    if cols:
+        if type(cols) != list:
+            if type(cols) in [str,int,float]:
+                cols = [cols]
+            else:
+                cols = list(cols)
+        not_found = [col for col in cols if col not in df.columns]
+        if len(not_found)>0:
+            raise AttributeError(not_found, 'is not found in', list(df.columns))
+    else:
+        cols = df.select_dtypes('number').columns
+    rows = ceil(len(cols)/3)*2
+    if len(cols)<4:
+        columns = len(cols)
+    else:
+        columns = 3 
+    fig, axes = plt.subplots(rows,columns, figsize = (18,3*rows))
+    ax_idx = 0
+    for col_idx in range(0,len(cols),columns):
+        selected_cols = cols[col_idx:col_idx+columns]
+        ax_lim = ax_idx + 2
+        while ax_idx < ax_lim:
+            axs = axes[ax_idx]
+            for col, ax in zip(selected_cols, axs):
+                if ax_idx%2!=0:
+                    if hue!=None:
+                        for h in df[hue].unique():
+                            sns.distplot(a=df[df[hue]==h][col].dropna(), label = f'{hue} = {h}', ax = ax, bins=bins, *args, **kwargs)
+                    else:
+                        sns.distplot(a=df[col].dropna(), ax = ax, bins=bins, *args, **kwargs)
+                else:
+                    if hue!=None:
+                        sns.boxplot(data=pd.DataFrame({f'{hue} = {h}':df[df[hue]==h][col].dropna() for h in df[hue].unique()}),orient='h',ax=ax, *args, **kwargs)
+                    else:
+                        sns.boxplot(data=df[col].dropna(), orient='h', ax=ax, *args, **kwargs)
+            ax_idx += 1
+    plt.tight_layout()
+    plt.show()
